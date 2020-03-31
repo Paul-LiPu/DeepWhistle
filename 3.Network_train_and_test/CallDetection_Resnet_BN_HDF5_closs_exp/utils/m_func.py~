@@ -1,0 +1,157 @@
+import numpy as np
+import torch
+import torch.nn.init as init
+import cv2
+from torch.autograd import Variable
+from utils.m_global import dtype
+
+
+def weights_init_constant(m, std):
+    classname = m.__class__.__name__
+#     print classname
+    if classname.find('Conv') != -1:
+        m.weight.data.normal_(mean = 0.0, std = std)
+        if m.bias is not None:
+            m.bias.data.zero_()
+    elif classname.find('BatchNorm') != -1:
+        m.weight.data.fill_(1.)
+        m.bias.data.fill_(0.)#zero_()
+    elif classname.find('Linear') != -1:
+        m.weight.data.normal_(0.0, std)
+        m.bias.data.zero_()
+
+
+def weights_init_xavier(m):
+    classname = m.__class__.__name__
+    if classname.find('Conv') != -1:
+        #std = np.sqrt(2./(m.kernel_size[0]*m.kernel_size[1]*m.out_channels))
+        #m.weight.data.normal_(0.0, std)
+        #m.bias.data.zero_()
+
+        init.xavier_normal(m.weight.data)
+        if m.bias is not None:
+            init.constant(m.bias.data, 0.)
+    elif classname.find('BatchNorm') != -1:
+        m.weight.data.fill_(1.)
+        m.bias.data.fill_(0.0)
+    elif classname.find('Linear') != -1:
+        m.weight.data.normal_(0.0, 0.001)
+        m.bias.data.zero_()
+
+
+def weights_init_msra(m):
+    classname = m.__class__.__name__
+#     print classname
+    if classname.find('Conv') != -1:
+        std = np.sqrt(2. / (m.kernel_size[0] * m.kernel_size[1] * m.in_channels))
+        # init.kaiming_uniform(m.weight.data, mode='fan_in')
+        m.weight.data.normal_(mean=0.0, std=std)
+        m.bias.data.zero_()
+    elif classname.find('BatchNorm') != -1:
+        #print m.weight.data.numpy()
+        m.weight.data.fill_(1.)
+        #print m.weight.data.numpy()
+        m.bias.data.fill_(0.)#zero_()
+    elif classname.find('Linear') != -1:
+        m.weight.data.normal_(0.0, 0.001)
+        m.bias.data.zero_()
+
+def weights_init_He_normal(m):
+    classname = m.__class__.__name__
+#     print classname
+    if classname.find('Transpose') != -1:
+        m.weight.data.normal_(0.0, 0.001)
+        m.bias.data.zero_()
+    elif classname.find('Conv') != -1:
+        # std = np.sqrt(2. / (m.kernel_size[0] * m.kernel_size[1] * m.out_channels))
+        # m.weight.data.normal_(0.0, std)
+        init.kaiming_normal(m.weight.data, a=0, mode='fan_out')
+        m.bias.data.zero_()
+    elif classname.find('BatchNorm') != -1:
+        m.weight.data.fill_(1.)
+        m.bias.data.fill_(0.)
+    elif classname.find('Linear') != -1:
+        m.weight.data.normal_(0.0, 0.001)
+        m.bias.data.zero_()
+
+
+
+def cal_psnr(im1, im2):
+    mse = ((im1.astype(np.float) - im2.astype(np.float)) ** 2).mean()
+    psnr = 10 * np.log10(255 ** 2 / mse)
+    return psnr
+
+
+def parse_class(classname):
+    split_result = classname.split('_')
+    noise = split_result[0]
+    scale = split_result[1]
+    noise = noise[4:]
+    scale = scale[1:]
+    return noise, int(scale)
+
+
+def evaluate_sr_project(sr_net_dict, denoise_net_dict, test_dataset, config):
+    psnr_list = []
+    for i_test_batch in range(0, len(test_dataset) / config.batch_size):
+        test_dataset.updateBatch()
+        class_name = test_dataset.getClassname()
+        noise, scale = parse_class(class_name)
+        test_batched = test_dataset.currentBatch
+        input = Variable(torch.from_numpy(np.asarray(test_batched[0]))).type(dtype)
+        label_tensor = Variable(torch.from_numpy(np.asarray(test_batched[1]))).type(dtype)
+        inter_feature = denoise_net_dict[noise](input)
+        output = sr_net_dict[scale](inter_feature)
+
+        output = np.clip((output.cpu().data.numpy()) * 255., 0, 255).astype(np.uint8)
+
+        label = np.clip(np.asarray(test_batched[1]) * 255, 0, 255).astype(np.uint8)
+
+        for i in range(0, len(label)):
+            test_psnr = cal_psnr(output[i,], label[i,])
+            psnr_list.append(test_psnr)
+    return psnr_list
+
+
+def evaluate_sr_project_on_datasets(sr_net_dict, denoise_net_dict, test_datasets, config):
+    psnr_list = []
+    for data_class in test_datasets.keys():
+        test_dataset = test_datasets[data_class]
+        noise, scale = parse_class(data_class)
+        denoise_model = denoise_net_dict[noise]
+        sr_model = sr_net_dict[scale]
+        for i_test_batch in xrange(0, len(test_dataset) / config.batch_size):
+            test_batched = next(test_dataset)
+            input = Variable(torch.from_numpy(np.asarray(test_batched[0]))).type(dtype)
+            inter_feature = denoise_model(input)
+            output = sr_model(inter_feature)
+            output = np.clip((output.cpu().data.numpy()) * 255., 0, 255).astype(np.uint8)
+            label = np.clip(np.asarray(test_batched[1]) * 255., 0, 255).astype(np.uint8)
+
+            for i in xrange(0, len(label)):
+                test_psnr = cal_psnr(output[i,], label[i,])
+                psnr_list.append(test_psnr)
+    return psnr_list
+
+
+def evaluate_sr_project_on_each_dataset(sr_net_dict, denoise_net_dict, test_datasets, config):
+    psnr_list = {}
+    for data_class in test_datasets.keys():
+        test_dataset = test_datasets[data_class]
+        noise, scale = parse_class(data_class)
+        denoise_model = denoise_net_dict[noise]
+        sr_model = sr_net_dict[scale]
+        psnr = []
+        for i_test_batch in xrange(0, len(test_dataset) / config.batch_size):
+            test_batched = next(test_dataset)
+            input = Variable(torch.from_numpy(np.asarray(test_batched[0]))).type(dtype)
+            inter_feature = denoise_model(input)
+            output = sr_model(inter_feature)
+            output = np.clip((output.cpu().data.numpy()) * 255., 0, 255).astype(np.uint8)
+            label = np.clip(np.asarray(test_batched[1]) * 255., 0, 255).astype(np.uint8)
+
+            for i in xrange(0, len(label)):
+                test_psnr = cal_psnr(output[i,], label[i,])
+                psnr.append(test_psnr)
+        psnr_list[data_class] = psnr
+    return psnr_list
