@@ -7,10 +7,10 @@ addpath('./functions/')
 %%%%%% base_dir/test_group is the folder containing testing spectrogram and GT %%%%%%
 %%%%%% base_dir/test_group is the folder containing testing spectrogram and GT %%%%%%
 %%%%%% output_dir/data_group is the folder to output the HDF5 file %%%%%%
-base_dir = '';
-data_group = '';
-test_group = '';
-output_dir='';
+base_dir = '/data2/code/dwc/data/';
+data_group = 'test_output';
+test_group = 'test_output';
+output_dir='/data2/code/dwc/data/test_hdf5/';
 %%%%%%%%%%%%
 
 output_dir = [output_dir, '/', data_group];

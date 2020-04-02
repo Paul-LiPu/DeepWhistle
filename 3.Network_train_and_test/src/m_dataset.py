@@ -15,7 +15,7 @@ def get_parentdir(dir):
     return parent_folder
 
 def classify_filelist(file_list):
-    classes = map(get_parentdir, file_list)
+    classes = list(map(get_parentdir, file_list))
     file_dict = {}
     for i in range(0, len(file_list)):
         if not classes[i] in file_dict.keys():
@@ -39,6 +39,64 @@ def read_h5_length(file):
     return length
 
 
+class Env:
+    # class for reading and writing numpy data
+    def __init__(self, file, mode, mapsize=1e12, max_readers=16):
+        self.env = None
+        if mode == 'w':
+            self.env = lmdb.open(file, map_size=mapsize)
+        elif mode == 'r':
+            self.env = lmdb.open(file, max_readers=max_readers, readonly=True,
+                                 lock=False, readahead=False, meminit=False)
+        else:
+            raise NotImplementedError
+
+    def write(self, key, data, txn=None):
+        if txn is None:
+            with self.env.begin(write=True) as txn:
+                txn.put(key.encode(), data.tobytes())
+        else:
+            txn.put(key.encode(), data.tobytes())
+
+    def read(self, key, type, txn=None, count=-1):
+        if txn is None:
+            with self.env.begin(write=False) as txn:
+                data = txn.get(key.encode())
+                np_data = np.frombuffer(data, dtype=type, count=count)
+                return np_data
+        else:
+            data = txn.get(key.encode())
+            np_data = np.frombuffer(data, dtype=type, count=count)
+            return np_data
+
+    def writestr(self, key, data, txn=None):
+        """
+        storing list of string to lmdb file.
+        :param key:
+        :param data: string list. No string should contains '\t'
+        :param txn:
+        :return:
+        """
+        if txn is None:
+            with self.env.begin(write=True) as txn:
+                txn.put(key.encode(), '\t'.join(data).encode())
+        else:
+            txn.put(key.encode(), '\t'.join(data).encode())
+
+    def readstr(self, key, txn=None):
+        if txn is None:
+            with self.env.begin(write=False) as txn:
+                data = txn.get(key.encode())
+                str = data.decode()
+                strs = str.split('\t')
+                return strs
+        else:
+            data = txn.get(key.encode())
+            str = data.decode()
+            strs = str.split('\t')
+            return strs
+
+
 # network definition
 class HDF5_Dataset_transpose():
     def __init__(self, hdf5_list, batchsize):
@@ -49,7 +107,7 @@ class HDF5_Dataset_transpose():
         self.curr_file = 0
         self.curr_file_pointer = 0
 
-        length_list = map(read_h5_length, hdf5_list)
+        length_list = list(map(read_h5_length, hdf5_list))
         self.len_list = length_list
         self.total_count = np.sum(length_list)
 
@@ -60,6 +118,21 @@ class HDF5_Dataset_transpose():
         return self
 
     def next(self):
+        h5_file = self.hdf5_list[self.curr_file]
+        data, label = read_h5_pos(h5_file, self.curr_file_pointer, self.batch_size)
+        data = np.transpose(data, (0, 1, 3, 2))
+        label = np.transpose(label, (0, 1, 3, 2))
+        self.curr_file_pointer += self.batch_size
+        if self.curr_file_pointer >= self.len_list[self.curr_file]:
+            self.curr_file_pointer = 0
+            self.curr_file += 1
+            if self.curr_file + 1 > self.nfiles:
+                self.curr_file = 0
+                self.epoches += 1
+        return data, label
+
+    # for compatible with python 3.
+    def __next__(self):
         h5_file = self.hdf5_list[self.curr_file]
         data, label = read_h5_pos(h5_file, self.curr_file_pointer, self.batch_size)
         data = np.transpose(data, (0, 1, 3, 2))
@@ -85,18 +158,19 @@ class Dataset_lmdb_manual_data3(Dataset):
         self.signal_range = signal_max - signal_min
         self.synthesize_portion = synthesize_portion
 
-        self.positive_env = lmdb.open(self.positive_file, max_readers=max_readers, readonly=True, lock=False,
-                        readahead=False, meminit=False)
-        self.positive_ndata = self.positive_env.stat()['entries'] // 2
-        with self.positive_env.begin(write=False) as txn:
+        # self.positive_env = lmdb.open(self.positive_file, max_readers=max_readers, readonly=True, lock=False,
+        #                 readahead=False, meminit=False)
+        self.positive_env = Env(self.positive_file, 'r', mapsize=1e12, max_readers=max_readers)
+        self.positive_ndata = self.positive_env.env.stat()['entries'] // 2
+        with self.positive_env.env.begin(write=False) as txn:
             str_id = '{:08}'.format(0)
-            data = txn.get('data-' + str_id)
-        data = np.fromstring(data, dtype=np.float32)
+            data = self.positive_env.read('data-' + str_id, np.float32, txn=txn)
         self.data_size = int(np.sqrt(data.shape[0]))
 
-        self.negative_env = lmdb.open(self.negative_file, max_readers=max_readers, readonly=True, lock=False,
-                        readahead=False, meminit=False)
-        self.negative_ndata = self.negative_env.stat()['entries'] // 2
+        # self.negative_env = lmdb.open(self.negative_file, max_readers=max_readers, readonly=True, lock=False,
+        #                 readahead=False, meminit=False)
+        self.negative_env = Env(self.negative_file, 'r', mapsize=1e12, max_readers=max_readers)
+        self.negative_ndata = self.negative_env.env.stat()['entries'] // 2
         self.data_num = self.positive_ndata + self.negative_ndata
 
     def __len__(self):
@@ -106,21 +180,23 @@ class Dataset_lmdb_manual_data3(Dataset):
         sample = {}
         rand_idx = np.random.randint(0, self.negative_ndata)
         str_id = '{:08}'.format(rand_idx)
-        with self.negative_env.begin(write=False) as txn:
-            data = txn.get('data-' + str_id)
-            label = txn.get('label-' + str_id)
-        data = np.fromstring(data, dtype=np.float32)
+        with self.negative_env.env.begin(write=False) as txn:
+            # data = txn.get('data-' + str_id)
+            # label = txn.get('label-' + str_id)
+            data = self.negative_env.read('data-' + str_id, np.float32, txn=txn)
+            label = self.negative_env.read('label-' + str_id, np.float32, txn=txn)
+        # data = np.fromstring(data, dtype=np.float32)
         data = data.reshape(1, self.data_size, self.data_size)
-        label = np.fromstring(label, dtype=np.float32)
+        # label = np.fromstring(label, dtype=np.float32)
         label = label.reshape(1, self.data_size, self.data_size)
 
         rand_num = np.random.rand()
         if rand_num < self.pos_portion:
             rand_idx = np.random.randint(self.positive_ndata)
             str_id = '{:08}'.format(rand_idx)
-            with self.positive_env.begin(write=False) as txn:
-                pos_label = txn.get('label-' + str_id)
-            pos_label = np.fromstring(pos_label, dtype=np.float32)
+            with self.positive_env.env.begin(write=False) as txn:
+                pos_label = self.positive_env.read('label-' + str_id, np.float32, txn=txn)
+            # pos_label = np.fromstring(pos_label, dtype=np.float32)
 
             pos_label = pos_label.reshape(1, self.data_size, self.data_size)
             label = label + pos_label
@@ -155,19 +231,19 @@ class Dataset_lmdb_manual_data2_recall3(Dataset):
         self.signal_range = signal_max - signal_min
         self.synthesize_portion = synthesize_portion
 
-
-        self.positive_env = lmdb.open(self.positive_file, max_readers=max_readers, readonly=True, lock=False,
-                        readahead=False, meminit=False)
-        self.positive_ndata = self.positive_env.stat()['entries'] // 2
-        with self.positive_env.begin(write=False) as txn:
+        # self.positive_env = lmdb.open(self.positive_file, max_readers=max_readers, readonly=True, lock=False,
+        #                 readahead=False, meminit=False)
+        self.positive_env = Env(self.positive_file, 'r', mapsize=1e12, max_readers=max_readers)
+        self.positive_ndata = self.positive_env.env.stat()['entries'] // 2
+        with self.positive_env.env.begin(write=False) as txn:
             str_id = '{:08}'.format(0)
-            data = txn.get('data-' + str_id)
-        data = np.fromstring(data, dtype=np.float32)
+            data = self.positive_env.read('data-' + str_id, np.float32, txn=txn)
         self.data_size = int(np.sqrt(data.shape[0]))
 
-        self.negative_env = lmdb.open(self.negative_file, max_readers=max_readers, readonly=True, lock=False,
-                        readahead=False, meminit=False)
-        self.negative_ndata = self.negative_env.stat()['entries'] // 2
+        # self.negative_env = lmdb.open(self.negative_file, max_readers=max_readers, readonly=True, lock=False,
+        #                 readahead=False, meminit=False)
+        self.negative_env = Env(self.negative_file, 'r', mapsize=1e12, max_readers=max_readers)
+        self.negative_ndata = self.negative_env.env.stat()['entries'] // 2
         self.data_num = self.positive_ndata + self.negative_ndata
 
         self.recall = np.ones(self.positive_ndata) / self.positive_ndata
@@ -182,12 +258,14 @@ class Dataset_lmdb_manual_data2_recall3(Dataset):
         rand_idx = np.random.randint(0, self.negative_ndata)
         str_id = '{:08}'.format(rand_idx)
 
-        with self.negative_env.begin(write=False) as txn:
-            data = txn.get('data-' + str_id)
-            label = txn.get('label-' + str_id)
-        data = np.fromstring(data, dtype=np.float32)
+        with self.negative_env.env.begin(write=False) as txn:
+            # data = txn.get('data-' + str_id)
+            # label = txn.get('label-' + str_id)
+            data = self.negative_env.read('data-' + str_id, np.float32, txn=txn)
+            label = self.negative_env.read('label-' + str_id, np.float32, txn=txn)
+        # data = np.fromstring(data, dtype=np.float32)
         data = data.reshape(1, self.data_size, self.data_size)
-        label = np.fromstring(label, dtype=np.float32)
+        # label = np.fromstring(label, dtype=np.float32)
         label = label.reshape(1, self.data_size, self.data_size)
 
         rand_num = np.random.rand()
@@ -195,9 +273,8 @@ class Dataset_lmdb_manual_data2_recall3(Dataset):
             rand_num2 = np.random.rand()
             rand_idx = bisect.bisect_left(self.recall_list, rand_num2)
             str_id = '{:08}'.format(rand_idx)
-            with self.positive_env.begin(write=False) as txn:
-                pos_label = txn.get('label-' + str_id)
-            pos_label = np.fromstring(pos_label, dtype=np.float32)
+            with self.positive_env.env.begin(write=False) as txn:
+                pos_label = self.positive_env.read('label-' + str_id, np.float32, txn=txn)
 
             pos_label = pos_label.reshape(1, self.data_size, self.data_size)
             label = label + pos_label

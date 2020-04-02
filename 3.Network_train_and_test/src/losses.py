@@ -3,7 +3,7 @@ import torch
 from torch.autograd import Variable
 import numpy as np
 
-from utils.m_global import dtype
+from .m_global import dtype
 
 bce_loss = nn.BCELoss().type(dtype)
 mse_loss = nn.MSELoss().type(dtype)

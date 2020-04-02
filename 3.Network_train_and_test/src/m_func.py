@@ -3,8 +3,9 @@ import torch
 import torch.nn.init as init
 import cv2
 from torch.autograd import Variable
-from utils.m_global import dtype
+from .m_global import dtype
 import os
+import fnmatch
 
 def weights_init_constant(m, std):
     classname = m.__class__.__name__
@@ -82,15 +83,18 @@ def weights_init_He_normal(m):
 
 def cal_psnr(im1, im2):
     mse = ((im1.astype(np.float) - im2.astype(np.float)) ** 2).mean()
-    psnr = 10 * np.log10(255 ** 2 / mse)
+    psnr = 10 * np.log10(255 ** 2 / (mse + 1e-5))
     return psnr
 
+def cal_mse(im1, im2):
+    mse = ((im1.astype(np.float) - im2.astype(np.float)) ** 2).mean()
+    return mse
 
 
 
 def evaluate_detection_network(net, test_dataset, config, iterations):
     psnr = []
-    for i_test_batch in xrange(0, len(test_dataset) / config.test_batchsize ):
+    for i_test_batch in range(0, len(test_dataset) // config.test_batchsize ):
         test_batched = next(test_dataset)
         input = Variable(torch.from_numpy(np.asarray(test_batched[0]))).type(dtype)
         output = net(input)
@@ -105,15 +109,17 @@ def evaluate_detection_network(net, test_dataset, config, iterations):
             cv2.imwrite(config.test_folder + '/test_image_iter_'+str(iterations)+'_output.png', output_image)
             output_image = label[output_patch, 0, :, :]
             cv2.imwrite(config.test_folder + '/test_image_iter_' + str(iterations) + '_GT.png', output_image)
-        for i in xrange(0, len(label)):
-            test_psnr = cal_psnr(output[i,], label[i,])
-            psnr.append(test_psnr)
+        for i in range(0, len(label)):
+            # test_psnr = cal_psnr(output[i,], label[i,])
+            # psnr.append(test_psnr)
+            test_mse = cal_mse(output[i,], label[i,])
+            psnr.append(test_mse)
     return psnr
 
 
 def evaluate_detection_network_hdf5_PR(net, test_dataset, config):
     recall = np.asarray([])
-    for i_test_batch in xrange(0, len(test_dataset) / config.batch_size):
+    for i_test_batch in range(0, len(test_dataset) // config.batch_size):
         sample_batched = next(test_dataset)
         input = Variable(torch.from_numpy(sample_batched[0])).type(dtype)
         binary_criteria = 0.5
@@ -138,12 +144,13 @@ def make_dir(dir):
         os.makedirs(dir)
 
 def removeLineFeed(line):
-    return line[:-1]
+    temp = line.split('\n')
+    return temp[0]
 
 def read_lmdb_list(file):
     with open(file) as f:
         data = f.readlines()
-    data = map(removeLineFeed, data)
+    data = list(map(removeLineFeed, data))
     return data
 
 def parse_class(classname):
@@ -162,7 +169,7 @@ def worker_init_fn(worker_id):
 
 
 def find_test_image_h5(test_dataset, config):
-    for i_test_batch in xrange(0, len(test_dataset) / config.test_batchsize):
+    for i_test_batch in range(0, len(test_dataset) // config.test_batchsize):
         test_batched = next(test_dataset)
         label = np.asarray(test_batched[1])
         label = np.reshape(label, (label.shape[0] * label.shape[1], label.shape[2] * label.shape[3]))
@@ -185,7 +192,7 @@ def list_all_dir(path):
 
 def list_all(path):
     files = os.listdir(path)
-    return map(join_path(path), files)
+    return list(map(join_path(path), files))
 
 def findfiles(path, fnmatchex='*.*'):
     result = []
@@ -216,7 +223,7 @@ def load_image(image_file):
     return image
 
 def load_image_list(image_file_list):
-    images = map(cv2.imread, image_file_list)
+    images = list(map(cv2.imread, image_file_list))
     return images
 
 def RGB_TO_YCRCB(image_rgb):
@@ -228,7 +235,7 @@ def YCRCB_TO_RGB(image_yuv):
     return image_rgb
 
 def RGB_TO_YCRCB_BATCH(images):
-    return map(RGB_TO_YCRCB, images)
+    return list(map(RGB_TO_YCRCB, images))
 
 def extractChannel(channel):
     def sub_func(image):
@@ -240,5 +247,5 @@ def image_to_file(image, file):
 
 def extractChannel_batch(channel):
     def subfunc(image_list):
-        return map(extractChannel(channel), image_list)
+        return list(map(extractChannel(channel), image_list))
     return subfunc

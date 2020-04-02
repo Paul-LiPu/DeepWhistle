@@ -1,1 +1,1 @@
-/home/lipu/Documents/whale_recognition/Train_data/HDF5/DCL/common_bottlenose_framel-8_step-2_log_magspec_wavio_24bit_block_lineGT_smoothInput_0.025/test_common_bottlenose_framel-8_step-2_log_magspec_wavio_24bit_block_lineGT_patch50_stride25.h5
+data/test.h5

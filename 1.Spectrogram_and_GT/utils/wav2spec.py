@@ -22,7 +22,7 @@ def log_magnitute_spectrum_GT_DCL_blockwise3(processBlock_func, frame_time_span,
         wav_filename = split_result[0]
         wav_time_ms = wav_data['nframes'] * 1000.0 / wav_data['framerate'] - step_time_span
         nsplit = int(math.ceil(wav_time_ms / split_time))
-        for i in xrange(nsplit):
+        for i in range(nsplit):
             start_time_ms = i * split_time
             end_time_ms =(i + 1) * split_time if (i + 1) * split_time < wav_time_ms else wav_time_ms
             imsave_output_filename = imsave_output_dir + '/' + wav_filename + '_uniclip_logspec' + str(i) + '.png'
@@ -60,7 +60,7 @@ def processBlock_lineGT(wav_data, split_func, bin_data, freq_resolution, min_fre
         previous_bin = 0
         previous_freq = 0
         first_flag = True
-        for i in xrange(len(time_stamps)):
+        for i in range(len(time_stamps)):
             if time_stamps[i] < start_time / 1000 or time_stamps[i] > end_time / 1000:
                 continue
             time_stamp = (time_stamps[i] - start_time / 1000) * 1000 / step_time_span
@@ -203,6 +203,8 @@ def bin2wav_filename(bin_file):
     return bin_name + '.wav'
 
 ####### Read .bin file helper function.
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from tonal_lipu import tonal
 def read_tonal_file(tonal_file):
     tonal_reader = tonal(tonal_file)

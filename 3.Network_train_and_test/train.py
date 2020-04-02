@@ -2,18 +2,18 @@ import numpy as np
 from torch.autograd import Variable
 import torch.optim as optim
 import os
+import sys
 
 import logging
 import torch.optim.lr_scheduler
 from torch.utils.data import DataLoader
 
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from src.m_global import dtype
 import src.m_dataset as m_dataset
 import src.models as models
 import src.losses as losses
-
 import src.m_func as m_func
-import sys
 import time
 
 
@@ -30,7 +30,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--data_type', type=str, required=True, help='h5 or lmdb')
 parser.add_argument('--train_data', type=str, required=True, help='path to a text file, each line of which contains one training data file')
 parser.add_argument('--test_data', type=str, required=True, help='path to a text file, each line of which contains one testing data file')
-parser.add_argument('--recall_val_data', type=str, required=True, help='path to a text file, each line of which contains one validation file for recall calculation')
+parser.add_argument('--recall_val_data', type=str, default='', help='path to a text file, each line of which contains one validation file for recall calculation')
 parser.add_argument('--exp_name', type=str, default=timestamp, help='experiment name')
 parser.add_argument('--model_name', type=str, default='DWC', help='model name')
 parser.add_argument('--learning_rate', type=float, default=0.001, help='base learning rate')
@@ -50,6 +50,7 @@ config = parser.parse_args()
 # Read data locations from configuration files.
 train_file = config.train_data
 train_filelist = m_func.read_lmdb_list(config.train_data)
+print(train_filelist)
 
 test_file = config.test_data
 test_filelist = m_func.read_lmdb_list(config.test_data)
@@ -73,6 +74,7 @@ config.save_folder = exp_directory + '/models/' + config.exp_name
 m_func.make_dir(config.save_folder)
 config.save_folder += '/' + config.name
 config.log_folder = exp_directory + '/logs/' + config.exp_name
+m_func.make_dir(config.log_folder)
 
 # Configure logger
 logging.getLogger('PIL').setLevel(logging.CRITICAL)
@@ -134,7 +136,7 @@ epoch = 0
 all_net.eval()
 psnr_list = m_func.evaluate_detection_network(net, test_dataset, config, iterations)
 mean_psnr = np.mean(psnr_list)
-logging.info('Validation###[epoch ' + str(epoch) + " iter " + str(iterations) + ']: mean psnr : ' + str(mean_psnr))
+logging.info('Validation###[epoch ' + str(epoch) + " iter " + str(iterations) + ']: mse: ' + str(mean_psnr))
 all_net.train()
 
 
@@ -147,8 +149,11 @@ def train_one_iteration(net, input, label, config, iterations, epoch, loss_list)
     label = Variable(label).type(dtype)
     output = net(input)
     loss = losses.C_Loss(output, label)
-
-    loss_list.append(loss.cpu().data.numpy()[0])
+    loss_np = loss.cpu().data.numpy().tolist()
+    if isinstance(loss_np, list) > 0:
+        loss_list.append(loss_np[0])
+    else:
+        loss_list.append(loss_np)
     if iterations % config.n_train_log == 0:
         mean_loss = np.mean(loss_list)
         logging.info(
@@ -170,7 +175,7 @@ def train_one_iteration(net, input, label, config, iterations, epoch, loss_list)
         psnr_list = m_func.evaluate_detection_network(net, test_dataset, config, iterations)
         mean_psnr = np.mean(psnr_list)
         logging.info(
-            'Validation###[epoch ' + str(epoch) + " iter " + str(iterations) + ']: mean psnr : ' + str(mean_psnr))
+            'Validation###[epoch ' + str(epoch) + " iter " + str(iterations) + ']: mean mse : ' + str(mean_psnr))
         net.train()
 
     if iterations % config.epoch_size == 0:

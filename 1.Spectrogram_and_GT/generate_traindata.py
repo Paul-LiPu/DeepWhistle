@@ -4,7 +4,11 @@
 # @Author  : Pu Li
 # @File    : generateSpectrogram.py
 
+import sys
+
 import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 import utils.wav2spec as wav2spec
 import argparse
 
@@ -37,7 +41,9 @@ split_time = config.split_time # ms, length of time for each output spectrogram 
 wav_files = wav2spec.find_wav_files(config.audio_dir)
 
 # collect all .wav filenames
-wav_names = map(os.path.basename, wav_files)
+wav_names = list(map(os.path.basename, wav_files))
+# if len(wav_files) == 1:
+#     wav_names = [wav_names]
 wav_file_dict = {wav_names[i] : wav_files[i] for i in range(len(wav_names))}
 
 # collect all .bin files.
@@ -45,9 +51,9 @@ exp_group = os.path.basename(config.annotation_dir)
 bin_files = wav2spec.findfiles(config.annotation_dir, fnmatchex='*.bin')
 
 # find all .wav files that have corresponding .bin files.
-anno_wav_filenames = map(wav2spec.bin2wav_filename, bin_files)
+anno_wav_filenames = list(map(wav2spec.bin2wav_filename, bin_files))
 anno_wav_files = [wav_file_dict[filename] for filename in anno_wav_filenames]
-map(wav2spec.get_wav_samplewidth, anno_wav_files)
+list(map(wav2spec.get_wav_samplewidth, anno_wav_files))
 
 ### set output directory
 imsave_output_dir = config.output_dir

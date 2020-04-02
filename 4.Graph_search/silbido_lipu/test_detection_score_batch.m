@@ -3,10 +3,10 @@ clear all; close all;
 %%%%%%%%%% PLEASE CONFIGURE THOSE PATHS. %%%%%%%%%%%%%%%%%%%
 USE_GRAPH_BASELINE = false; % use graph search method only if true
 USE_NET_OUTPUT = true;  % use network output + graph search method if true
-BASE_DIR = './';
-test_groups = '2011paper_dc'; % directory to .wav and .bin files.
+BASE_DIR = '.';
+test_group = 'common_bottlnose_all'; % directory to .wav and .bin files.
 test_dir = [BASE_DIR, '/test_data/', test_group];
-det_group = ''; % directory to network output
+det_group = '2020-04-01'; % directory to network output
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if ~exist(test_dir)
@@ -93,6 +93,4 @@ for i = 3:length(temp)
         'ResultName', [score_dir, '/', model_name],... % , '_JASA2011baseline'
         'GroundTruthCriteria', gt_criteria);
     dtAnalyzeResults(result, [score_dir, '/', model_name, '.summary']);
-    
-    [temp1, files] = processSummary([score_dir, '/', model_name,  '.summary']);
 end

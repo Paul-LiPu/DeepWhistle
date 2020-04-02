@@ -1,0 +1,6 @@
+04/01/2020 10:33:33 PM Start program
+04/01/2020 10:33:33 PM Test Picture batch: 0	picture num: 4
+04/01/2020 10:33:36 PM Validation###[epoch 0 iter 0]: mse: 59647.691098076924
+04/01/2020 10:33:36 PM Start Training ...
+04/01/2020 10:34:27 PM [epoch 0 iter 100]: lr: 0.001 loss: 89.532359085083
+04/01/2020 10:35:13 PM [epoch 0 iter 200]: lr: 0.001 loss: 60.73245364189148
