@@ -1,9 +1,27 @@
 import numpy as np
 from torch.utils.data import Dataset
+import os
 import h5py
+import os.path
 import bisect
 import lmdb
 from scipy.ndimage.filters import gaussian_filter
+
+
+## helper functions.
+def get_parentdir(dir):
+    parent_dir = os.path.dirname(dir)
+    parent_folder = os.path.basename(parent_dir)
+    return parent_folder
+
+def classify_filelist(file_list):
+    classes = map(get_parentdir, file_list)
+    file_dict = {}
+    for i in range(0, len(file_list)):
+        if not classes[i] in file_dict.keys():
+            file_dict[classes[i]] = []
+        file_dict[classes[i]].append(file_list[i])
+    return file_dict
 
 def read_h5_pos(file, pos, nsamples):
     h5file = h5py.File(file)
@@ -21,7 +39,7 @@ def read_h5_length(file):
     return length
 
 
-
+# network definition
 class HDF5_Dataset_transpose():
     def __init__(self, hdf5_list, batchsize):
         self.hdf5_list = hdf5_list
@@ -56,8 +74,6 @@ class HDF5_Dataset_transpose():
         return data, label
 
 
-
-
 class Dataset_lmdb_manual_data3(Dataset):
     def __init__(self, negative_file, positive_file, max_readers, pos_portion = 0.5, signal_min = 0.03, signal_max = 0.23
                  , synthesize_portion = 0.7):
@@ -88,7 +104,6 @@ class Dataset_lmdb_manual_data3(Dataset):
 
     def __getitem__(self, idx):
         sample = {}
-
         rand_idx = np.random.randint(0, self.negative_ndata)
         str_id = '{:08}'.format(rand_idx)
         with self.negative_env.begin(write=False) as txn:
@@ -197,6 +212,7 @@ class Dataset_lmdb_manual_data2_recall3(Dataset):
             data = data + pos_label_blur * rand_a
             data[data > 1] = 1
             label[label > 1] = 1
+
 
         data = np.transpose(data, (0, 2, 1))
         label = np.transpose(label, (0, 2, 1))

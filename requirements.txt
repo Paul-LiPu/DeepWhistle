@@ -1,0 +1,9 @@
+torch
+wave
+numpy
+python_speech_features
+fnmatch
+wavio
+opencv-python
+opencv-contrib-python
+scipy

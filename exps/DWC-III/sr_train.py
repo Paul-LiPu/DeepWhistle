@@ -155,6 +155,7 @@ all_net.train()
 
 
 
+
 # Start Training.
 logging.info("Start Training ...")
 loss_list = []

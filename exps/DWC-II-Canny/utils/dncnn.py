@@ -1,23 +1,16 @@
 import numpy as np
-import torch
 from torch.autograd import Variable
 import torch.nn as nn
-import torch.nn.functional as F
-import cv2
-import torchvision.models.vgg as vgg
-import torch.optim as optim
 import os
-import glob
-from torch.utils.data import Dataset, DataLoader
-from torchvision import transforms, utils
+from torch.utils.data import DataLoader
+from torchvision import transforms
 import logging
-import h5py
 import torch.optim.lr_scheduler
 from utils.m_global import dtype
 from utils.logger import Logger
 
 from utils.m_dataset import DnCNNDataset#DejpegDataset
-from utils.m_func import mod4crop, add_noise_cpu, weights_init_xavier as weights_init, evaluate
+from utils.m_func import add_noise_cpu, weights_init_xavier as weights_init, evaluate
 from src.models import DnCNN as Generator, DnCNNBlock as ResBlock
 from src.losses import euclideanLoss as mse_loss
 import sys    

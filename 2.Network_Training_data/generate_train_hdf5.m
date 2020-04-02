@@ -2,21 +2,24 @@
 clear all;
 addpath('./functions/')
 
-% directory to training data and testing data. 
-data_group = 'common_bottlenose_framel-8_step-2_log_magspec_wavio_24bit_block_lineGT';
-test_group = 'common_bottlenose_framel-8_step-2_log_magspec_wavio_24bit_block_lineGT_TEST';
+%%%%%% PATH YOU NEED TO CONFIGURE. %%%%%%
+%%%%%% base_dir/data_group is the folder containing training spectrogram and GT %%%%%%
+%%%%%% base_dir/test_group is the folder containing testing spectrogram and GT %%%%%%
+%%%%%% base_dir/test_group is the folder containing testing spectrogram and GT %%%%%%
+%%%%%% output_dir/data_group is the folder to output the HDF5 file %%%%%%
+base_dir = '';
+data_group = '';
+test_group = '';
+output_dir='';
+%%%%%%%%%%%%
 
-
-
-output_dir='/home/lipu/Documents/whale_recognition/Train_data/HDF5/DCL/';
 output_dir = [output_dir, '/', data_group];
 if ~exist(output_dir)
     mkdir(output_dir);
 end
 
 %% generate training data. 
-
-folder = ['/home/lipu/Documents/whale_recognition/Train_data/DCL/magspec_plot_original_all/', data_group, '/'];
+folder = [base_dir, '/', data_group, '/'];
 subdirs = dir(fullfile(folder, '*'));
 
 patchsize = 50;
@@ -121,7 +124,7 @@ end
 
 
 %% generate testing data. 
-folder = ['/home/lipu/Documents/whale_recognition/Train_data/DCL/magspec_plot_original_all/', test_group, '/'];
+folder = [base_dir, '/', test_group, '/'];
 subdirs = dir(fullfile(folder, '*'));
 
 patchsize = 50;

@@ -1,15 +1,10 @@
 import wave
 import numpy as np
-import matplotlib.pyplot as plt
 import math
 from python_speech_features import sigproc, base
-import time as pytime
-import Image
 import os
 import fnmatch
-import pylab
 import cv2
-import soundfile as sf
 import wavio
 
 # Spectrogram and ground truth generation.
@@ -155,7 +150,7 @@ def get_wav_samplewidth(wav_file):
     wav_filename = os.path.basename(wav_file)
     wav_filename = wav_filename.split('.wav')[0]
     samplewidth = wf.getsampwidth()
-    print wav_filename + ' samplewidth: ' + str(samplewidth)
+    print(wav_filename + ' samplewidth: ' + str(samplewidth))
     wf.close()
 
 # calculate another point on two points defined line.
@@ -206,8 +201,6 @@ def bin2wav_filename(bin_file):
     bin_filename = os.path.basename(bin_file)
     bin_name, ext = os.path.splitext(bin_filename)
     return bin_name + '.wav'
-
-
 
 ####### Read .bin file helper function.
 from tonal_lipu import tonal

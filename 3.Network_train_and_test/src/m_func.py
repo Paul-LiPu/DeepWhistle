@@ -4,7 +4,7 @@ import torch.nn.init as init
 import cv2
 from torch.autograd import Variable
 from utils.m_global import dtype
-
+import os
 
 def weights_init_constant(m, std):
     classname = m.__class__.__name__
@@ -109,3 +109,136 @@ def evaluate_detection_network(net, test_dataset, config, iterations):
             test_psnr = cal_psnr(output[i,], label[i,])
             psnr.append(test_psnr)
     return psnr
+
+
+def evaluate_detection_network_hdf5_PR(net, test_dataset, config):
+    recall = np.asarray([])
+    for i_test_batch in xrange(0, len(test_dataset) / config.batch_size):
+        sample_batched = next(test_dataset)
+        input = Variable(torch.from_numpy(sample_batched[0])).type(dtype)
+        binary_criteria = 0.5
+        output = net(input)
+        output = output.cpu().data.numpy()
+        output[output >= binary_criteria] = 1
+        output[output < binary_criteria] = 0
+        label = sample_batched[1]
+        output = np.reshape(output, (output.shape[0], output.shape[1] * output.shape[2] * output.shape[3]))
+        label = np.reshape(label, (label.shape[0], label.shape[1] * label.shape[2] * label.shape[3]))
+        true_positive = np.sum(output * label, axis=1)
+        # precision = true_positive / (np.sum(output, axis=1) + 1e-6)
+        recall_batch = (true_positive + 1e-6) / (np.sum(label, axis=1) + 1e-6)
+        recall = np.append(recall, recall_batch)
+    # recall[recall > 1] = 1
+    return recall
+
+
+# helper functions.
+def make_dir(dir):
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+
+def removeLineFeed(line):
+    return line[:-1]
+
+def read_lmdb_list(file):
+    with open(file) as f:
+        data = f.readlines()
+    data = map(removeLineFeed, data)
+    return data
+
+def parse_class(classname):
+    split_result = classname.split('_')
+    noise = split_result[0]
+    scale = split_result[1]
+    noise = noise[4:]
+    scale = scale[1:]
+    return noise, int(scale)
+
+def sort_list(images):
+    list.sort(images, key=str.lower)
+
+def worker_init_fn(worker_id):
+    np.random.seed((torch.initial_seed() + worker_id) % (2 ** 32))
+
+
+def find_test_image_h5(test_dataset, config):
+    for i_test_batch in xrange(0, len(test_dataset) / config.test_batchsize):
+        test_batched = next(test_dataset)
+        label = np.asarray(test_batched[1])
+        label = np.reshape(label, (label.shape[0] * label.shape[1], label.shape[2] * label.shape[3]))
+        label_sum = np.sum(label, axis=1)
+        for i in range(label.shape[0]):
+            if label_sum[i] > 0:
+                return i_test_batch, i
+
+
+
+#Helper functions.
+def list_all_dir(path):
+    result = []
+    files = os.listdir(path)
+    for file in files:
+        m = os.path.join(path, file)
+        if os.path.isdir(m):
+            result.append(m)
+    return result
+
+def list_all(path):
+    files = os.listdir(path)
+    return map(join_path(path), files)
+
+def findfiles(path, fnmatchex='*.*'):
+    result = []
+    for root, dirs, files in os.walk(path):
+        for filename in fnmatch.filter(files, fnmatchex):
+            fullname = os.path.join(root, filename)
+            result.append(fullname)
+    return result
+
+def list_png_files(path):
+    return findfiles(path, '*.png')
+
+def read_images(files):
+    result = []
+    for file in files:
+        if os.path.isdir(file):
+            result.append(file)
+    return result
+
+def join_path(base_dir):
+    def sub_func(file):
+        return os.path.join(base_dir, file)
+    return sub_func
+
+
+def load_image(image_file):
+    image = cv2.imread(image_file)
+    return image
+
+def load_image_list(image_file_list):
+    images = map(cv2.imread, image_file_list)
+    return images
+
+def RGB_TO_YCRCB(image_rgb):
+    image_yuv = cv2.cvtColor(image_rgb, cv2.COLOR_BGR2YCR_CB)
+    return image_yuv
+
+def YCRCB_TO_RGB(image_yuv):
+    image_rgb = cv2.cvtColor(image_yuv, cv2.COLOR_YCR_CB2BGR)
+    return image_rgb
+
+def RGB_TO_YCRCB_BATCH(images):
+    return map(RGB_TO_YCRCB, images)
+
+def extractChannel(channel):
+    def sub_func(image):
+        return image[:, :, channel]
+    return sub_func
+
+def image_to_file(image, file):
+    cv2.imwrite(file, image)
+
+def extractChannel_batch(channel):
+    def subfunc(image_list):
+        return map(extractChannel(channel), image_list)
+    return subfunc

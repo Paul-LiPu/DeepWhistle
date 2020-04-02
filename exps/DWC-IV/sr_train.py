@@ -69,7 +69,7 @@ test_data_file = data_base_dir + '/' + 'common_bottlenose_framel-8_step-2_log_ma
 
 
 # pre-trained model
-model_file = 'Reduce_0.0625_fold_8_randgauss_exp1/DSRCNN-iter_600000'
+model_file = 'Reduce_0.0625_fold_8_randgauss_exp1/DWC-II.pth'
 
 
 # Configure Training Parameters.
