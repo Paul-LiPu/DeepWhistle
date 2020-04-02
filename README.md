@@ -14,7 +14,7 @@ Other python libraries:
 > ```
 
 ### <a name="processed_data"></a> Our processed data
-To reproduce our experiment results, you may use our [processed data](https://drive.google.com/drive/folders/1mDBKIl0Ng_oRDCRdJQb_LnjJZz7LAtN0?usp=sharing).
+To reproduce our experiment results, you may use our [processed data](https://drive.google.com/open?id=1CDTupjz_nxEfSe1DUL7twn-K09QWvrI3).
 Those data are in hdf5 or lmdb format, which can be directly used by our model training code.
 
 |              | Train Data                                 | Test Data     |
