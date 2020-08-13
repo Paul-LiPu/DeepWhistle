@@ -1,6 +1,6 @@
 # DeepWhistle
 This repository is the implementation of our IJCNN 2020 paper:
-Learning Deep Models from Synthetic Data for Extracting Dolphin Whistle Contours
+[Learning Deep Models from Synthetic Data for Extracting Dolphin Whistle Contours](https://arxiv.org/abs/2005.08894)
 
 ### <a name="dependency"></a> Dependency
 * Ubuntu ≥ 14.04
