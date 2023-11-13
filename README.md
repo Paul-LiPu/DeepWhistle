@@ -2,6 +2,11 @@
 This repository is the implementation of our IJCNN 2020 paper:
 [Learning Deep Models from Synthetic Data for Extracting Dolphin Whistle Contours](https://arxiv.org/abs/2005.08894)
 
+### <a name="news"></a> News
+- [2023-11-12] We will release our codes for our paper 
+"[Using deep learning to track time× frequency whistle contours of toothed whales without human-annotated training data](https://pubs.aip.org/asa/jasa/article/154/1/502/2904481)" 
+published on JASA 2023 in another [repo](https://github.com/Paul-LiPu/pseudo-label_whistle_extraction).
+
 ### <a name="dependency"></a> Dependency
 * Ubuntu ≥ 14.04
 * Python ≥ 3.6.8
